@@ -1,0 +1,79 @@
+version: '3'
+ 
+services:
+  eserver:
+    image: docker.io/jayz77/pms-discovery-server
+    ports:
+      - "8761:8761"
+ 
+  auth:
+    image:  docker.io/jayz77/pms-auth-service
+    ports:
+      - "8085:8085"
+    environment:
+      - eureka.client.service-url.defaultZone=http://eserver:8761/eureka/
+      - eureka.instance.prefer-ip-address=true
+    depends_on:
+      - eserver
+ 
+  stock:
+    image:  docker.io/jayz77/pms-stock-service
+    ports:
+      - "8086:8086"
+    environment:
+      - eureka.client.service-url.defaultZone=http://eserver:8761/eureka/
+      - eureka.instance.prefer-ip-address=true
+    depends_on:
+      - eserver
+ 
+  schedule:
+    image: docker.io/jayz77/pms-schedule-service
+    ports:
+      - "8088:8088"
+    environment:
+      - eureka.client.service-url.defaultZone=http://eserver:8761/eureka/
+      - eureka.instance.prefer-ip-address=true
+    depends_on:
+      - eserver
+      - stock
+ 
+  supply:
+    image:  docker.io/jayz77/pms-supply-service
+    ports:
+      - "8082:8082"
+    environment:
+      - eureka.client.service-url.defaultZone=http://eserver:8761/eureka/
+      - eureka.instance.prefer-ip-address=true
+    depends_on:
+      - eserver
+      - schedule
+      - stock
+ 
+  api-gateway:
+    image:  docker.io/jayz77/pms-api-gateway
+    ports:
+      - "8084:8084"
+    environment:
+      - eureka.client.service-url.defaultZone=http://eserver:8761/eureka/
+      - eureka.instance.prefer-ip-address=true
+      - spring.cloud.gateway.routes[0].id=medical-stock-service
+      - spring.cloud.gateway.routes[0].uri=lb://medical-stock-service
+      - spring.cloud.gateway.routes[0].predicates[0]=Path=/stock/**
+ 
+      - spring.cloud.gateway.routes[1].id=authorization-service
+      - spring.cloud.gateway.routes[1].uri=lb://authorization-service
+      - spring.cloud.gateway.routes[1].predicates[0]=Path=/auth/**
+ 
+      - spring.cloud.gateway.routes[2].id=schedule-service
+      - spring.cloud.gateway.routes[2].uri=lb://schedule-service
+      - spring.cloud.gateway.routes[2].predicates[0]=Path=/schedule/**
+ 
+      - spring.cloud.gateway.routes[3].id=supply-service
+      - spring.cloud.gateway.routes[3].uri=lb://supply-service
+      - spring.cloud.gateway.routes[3].predicates[0]=Path=/supply/**
+    depends_on:
+      - eserver
+      - auth
+      - stock
+      - schedule
+      - supply
